@@ -4,10 +4,10 @@
 
 ### Perceptron
 
-![Perceptron](Perceptron.svg)
+![Perceptron](doc/Perceptron.svg)
 
 ### Forward Propagation
 
-![Forward Propagation](forward.svg)
+![Forward Propagation](doc/forward.svg)
 
 ### Back Propagation 
