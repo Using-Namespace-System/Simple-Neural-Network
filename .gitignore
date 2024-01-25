@@ -7,3 +7,6 @@ src/prime_sieve.egg-info/requires.txt
 src/prime_sieve.egg-info/SOURCES.txt
 src/prime_sieve.egg-info/top_level.txt
 src/perceptron/core/__pycache__/mcculloch_pitts_neuron.cpython-310.pyc
+src/perceptron/__pycache__/__init__.cpython-310.pyc
+src/perceptron/core/__pycache__/mcculloch_pitts_neuron.cpython-310.pyc
+src/perceptron/core/__pycache__/__init__.cpython-310.pyc
