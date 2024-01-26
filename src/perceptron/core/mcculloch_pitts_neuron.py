@@ -5,9 +5,12 @@ import math
 
 class neuron:
     __matrix: [['neuron.unit']]
-    __sensory_units: int
-    __association_units: int
-    __response_units: int
+    __num_sensory_units: int
+    __num_association_units: int
+    __num_response_units: int
+    __sensory_units: ['neuron.sensory_unit']
+    __association_units: ['neuron.association_unit']
+    __response_units: ['neuron.response_unit']
 
     class unit(object):
 
@@ -47,10 +50,10 @@ class neuron:
 
     class association_unit(unit):
         __excitatory_filter: [int]
-        threshold: int
+        threshold: float
         def __init__(self, *args, **kwargs):
             super(neuron.association_unit, self).__init__(*args, **kwargs)
-            self.threshold = 0
+            self.threshold = 0.7
             self.__excitatory_filter = []
         def add_parent(self, *args, filter: int):
             super(neuron.association_unit, self).add_parent(*args)
@@ -59,7 +62,7 @@ class neuron:
             return np.array([parent.value * mask for parent,mask in 
                              zip(self.parents, self.__excitatory_filter)])
         def activation(self):
-            return self.value >= self.threshold
+            return self.value > self.threshold
         
     class sensory_unit(unit):
         def set_children(self, children: ['neuron.association_unit'], excitatory_filter: [int]):
@@ -70,11 +73,13 @@ class neuron:
     class response_unit(unit):
         __inclusion_mask: [bool]
         __exclusion_mask: [bool]
+        threshold: float
         
         def __init__(self, *args, **kwargs):
             super(neuron.response_unit, self).__init__(*args, **kwargs)
             self.__inclusion_mask = []
             self.__exclusion_mask = []
+            self.threshold = 0.7
         def set_parents(self, parents: ['neuron.association_unit'], inclusions_exclusions: ([bool],[bool])):
             inclusions, exclusions = inclusions_exclusions
             for parent, inclusion, exclusion in zip(parents, inclusions, exclusions):
@@ -85,23 +90,23 @@ class neuron:
         def input_signals(self):
             return np.array([parent.value  for parent in self.parents])
         def activation(self):
-            return np.sum((self.input_signals() * np.array(self.__inclusion_mask))) > np.sum((self.input_signals() * np.array(self.__exclusion_mask)))
+            return np.sum((self.input_signals() * np.array(self.__inclusion_mask))) > (np.sum((self.input_signals() * np.array(self.__exclusion_mask)))) + self.threshold
 
         
     def fit(self,sensory_units:int = 64, association_units:int = 82, response_units:int = 2 ):
-        self.__matrix = [[neuron.sensory_unit(0,i,0) for i in range(0,sensory_units)],
-                    [neuron.association_unit(1,i,0) for i in range(0,association_units)],
-                    [neuron.response_unit(2,i,0) for i in range(0,response_units)]]
-        self.__sensory_units = sensory_units
-        self.__association_units = association_units
-        self.__response_units = response_units
+        self.__sensory_units = [neuron.sensory_unit(0,i,0) for i in range(0,sensory_units)]
+        self.__association_units = [neuron.association_unit(1,i,0) for i in range(0,association_units)]
+        self.__response_units = [neuron.response_unit(2,i,0) for i in range(0,response_units)]
+        self.__num_sensory_units = sensory_units
+        self.__num_association_units = association_units
+        self.__num_response_units = response_units
         #for each sensory_units add up to 8 random children (half negative half positive) from the pool of association_units
         excitatory_filter = np.full(int(math.sqrt(association_units)), 1)
         excitatory_filter[:(int(math.sqrt(association_units)/2))] = -1
-        for s_unit in self.__matrix[0]:
+        for s_unit in self.__sensory_units:
             np.random.shuffle(excitatory_filter)
             children = np.random.choice(association_units, int(math.sqrt(association_units)),replace=False)
-            s_unit.set_children(np.array(self.__matrix[1])[children],excitatory_filter)
+            s_unit.set_children(np.array(self.__association_units)[children],excitatory_filter)
         response_connections = np.arange(association_units)
         np.random.shuffle(response_connections)
         response_connections = np.split(response_connections, response_units)
@@ -117,28 +122,29 @@ class neuron:
             mutex_2 = np.logical_xor(mutex, np.logical_xor(mutex_copy,mutex))
             np.random.shuffle(mutex_copy)
             mutex_list.append((mutex_1,mutex_2))
-        for r_unit, response_connection, mute in zip(self.__matrix[2],response_connections,mutex_list):
-            r_unit.set_parents(np.array(self.__matrix[1])[response_connection],mute)
+        for r_unit, response_connection, mute in zip(self.__response_units,response_connections,mutex_list):
+            r_unit.set_parents(np.array(self.__association_units)[response_connection],mute)
             
 
         #slice 82 association units into 2 non overlapping subsets 
-        #for each of two possible states for each response unit create two overlapping
+        #for each of two possible states for each response unit 
+        #create two overlapping subsets
         
 
     def sensory_units(self):
-        return np.split(np.array([s_unit.value for s_unit in self.__matrix[0]]).T,int(math.sqrt(self.__sensory_units)))
+        return np.split(np.array([s_unit.value for s_unit in self.__sensory_units]).T,int(math.sqrt(self.__num_sensory_units)))
 
     def set_sensory_units(self, vals: [int]):
-        if len(self.__matrix[0]) == len(vals):
-            for s_unit, val in zip(self.__matrix[0], vals): s_unit.value = val
-            for a_unit in self.__matrix[1]: a_unit.value = sum(a_unit.input_signals())
-            for r_unit in self.__matrix[2]: r_unit.value = r_unit.activation()
+        if len(self.__sensory_units) == len(vals):
+            for s_unit, val in zip(self.__sensory_units, vals): s_unit.value = val
+            for a_unit in self.__association_units: a_unit.value = sum(a_unit.input_signals())
+            for r_unit in self.__response_units: r_unit.value = r_unit.activation()
         else:
-            print("Size Mismatch: " + str((len(self.__matrix[0]), len(vals))))
+            print("Size Mismatch: " + str((len(self.__sensory_units), len(vals))))
 
     def association_units(self):
-        return np.array([a_unit.value for a_unit in self.__matrix[1]])
+        return np.array([a_unit.value for a_unit in self.__association_units])
     
     def response_units(self):
-        return np.array([r_unit.value for r_unit in self.__matrix[2]])
+        return np.array([r_unit.value for r_unit in self.__response_units])
     
