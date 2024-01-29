@@ -8,3 +8,4 @@ __author__ = "Brian Recktenwall-Calvet"
 __license__ = "MIT License"
 
 from perceptron.core import neuron
+from perceptron.util import training

@@ -16,7 +16,7 @@ class neuron:
 
         layer: int
         identifier: int
-        value: int
+        value: float
         __parents: ['neuron.unit']
         __children: ['neuron.unit']
 
@@ -50,19 +50,36 @@ class neuron:
 
     class association_unit(unit):
         __excitatory_filter: [int]
+        __weight: float
+        __signals: [int]
         threshold: float
-        def __init__(self, *args, **kwargs):
-            super(neuron.association_unit, self).__init__(*args, **kwargs)
-            self.threshold = 0.7
+
+        @property
+        def weight(self):
+            return self.__weight
+        @weight.setter
+        def weight(self, weight):
+            if weight<= 0.02:
+                self.__weight = 0.02
+            else:
+                self.__weight = weight
+
+
+        def __init__(self, *args, threshold:float = 0.569 ):
+            super(neuron.association_unit, self).__init__(*args)
+            self.threshold = threshold
             self.__excitatory_filter = []
+            self.__signals = []
+            self.weight = 1
         def add_parent(self, *args, filter: int):
             super(neuron.association_unit, self).add_parent(*args)
             self.__excitatory_filter.append(filter)
         def input_signals(self):
-            return np.array([parent.value * mask for parent,mask in 
+            self.__signals = np.array([parent.value * mask for parent,mask in 
                              zip(self.parents, self.__excitatory_filter)])
+            return self.__signals
         def activation(self):
-            return self.value > self.threshold
+            return self.value * self.weight  > self.threshold
         
     class sensory_unit(unit):
         def set_children(self, children: ['neuron.association_unit'], excitatory_filter: [int]):
@@ -73,13 +90,23 @@ class neuron:
     class response_unit(unit):
         __inclusion_mask: [bool]
         __exclusion_mask: [bool]
+        __target: bool
         threshold: float
-        
-        def __init__(self, *args, **kwargs):
-            super(neuron.response_unit, self).__init__(*args, **kwargs)
+        @property
+        def target(self):
+            if self.__target:
+                return self.__inclusion_mask
+            else:
+                return self.__exclusion_mask
+        @target.setter
+        def target(self, target: int):
+            self.__target = bool(target)
+            
+        def __init__(self, *args, threshold:float = 0.5763):
+            super(neuron.response_unit, self).__init__(*args)
             self.__inclusion_mask = []
             self.__exclusion_mask = []
-            self.threshold = 0.7
+            self.threshold = threshold
         def set_parents(self, parents: ['neuron.association_unit'], inclusions_exclusions: ([bool],[bool])):
             inclusions, exclusions = inclusions_exclusions
             for parent, inclusion, exclusion in zip(parents, inclusions, exclusions):
@@ -88,10 +115,34 @@ class neuron:
                 self.__inclusion_mask.append(inclusion)
                 self.__exclusion_mask.append(exclusion)
         def input_signals(self):
-            return np.array([parent.value  for parent in self.parents])
+            return np.array([parent.activation()  for parent in self.parents])
+        def signal_summary(self):
+            input_signals = np.array([parent.value  for parent in self.parents])
+            masked_signals = (sum(input_signals* np.array(self.__inclusion_mask)), sum(input_signals * np.array(self.__exclusion_mask)))
+            masked_activated_signals = (sum(self.input_signals()* np.array(self.__inclusion_mask)), sum(self.input_signals() * np.array(self.__exclusion_mask)))
+            return (self.identifier, masked_activated_signals, masked_signals, self.input_signals(), input_signals)
+
         def activation(self):
             return np.sum((self.input_signals() * np.array(self.__inclusion_mask))) > (np.sum((self.input_signals() * np.array(self.__exclusion_mask)))) + self.threshold
-
+        def reinforce(self, target):
+            self.target = target
+            input_values = np.array([parent.value  for parent in self.parents]) * np.array(self.target)
+            secondary_weights = (self.input_signals() * np.array(self.target))
+            priority_weights = np.logical_xor(self.__inclusion_mask, self.__exclusion_mask) * np.array(self.target)
+            priority_weights = priority_weights * secondary_weights
+            #weights = priority_weights + secondary_weights
+            weights = priority_weights
+            weights = weights * input_values 
+            weights = weights * 4
+            weights = weights + secondary_weights
+            weights = weights * 1
+            weights = weights - 0.5
+            #weights = weights * 0.99
+            #weights = weights + 0.88
+            for parent, weight in zip(self.parents, weights):
+                parent.weight =  parent.weight + weight
+            
+                
         
     def fit(self,sensory_units:int = 64, association_units:int = 82, response_units:int = 2 ):
         self.__sensory_units = [neuron.sensory_unit(0,i,0) for i in range(0,sensory_units)]
@@ -148,3 +199,17 @@ class neuron:
     def response_units(self):
         return np.array([r_unit.value for r_unit in self.__response_units])
     
+    def check_calibration(self,idx, targets):
+        results = []
+        for r_unit, target in zip(self.__response_units, targets):
+            index, activated_mutex, mutex, activated_ingest, ingest = r_unit.signal_summary()
+            left, right = mutex
+            activated_left, activated_right = activated_mutex
+            result = np.array([idx,target,index,activated_left,left,activated_right,right, sum(activated_ingest), sum(ingest)])
+            results += [result]
+        return results
+            
+    
+    def reinforce(self, targets):
+        for r_unit, target in zip(self.__response_units, targets):
+            r_unit.reinforce(target)
