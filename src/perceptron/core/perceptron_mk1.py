@@ -52,24 +52,27 @@ class neuron:
         __excitatory_filter: [int]
         __weight: float
         __signals: [int]
+        __min_weight:float 
         threshold: float
+        
 
         @property
         def weight(self):
             return self.__weight
         @weight.setter
         def weight(self, weight):
-            if weight<= 0.02:
-                self.__weight = 0.02
+            if weight<= self.__min_weight:
+                self.__weight = self.__min_weight
             else:
                 self.__weight = weight
 
 
-        def __init__(self, *args, threshold:float = 0.569 ):
+        def __init__(self, *args, threshold:float = 0.569, min_weight:float = 0.02 ):
             super(neuron.association_unit, self).__init__(*args)
             self.threshold = threshold
             self.__excitatory_filter = []
             self.__signals = []
+            self.__min_weight = min_weight
             self.weight = 1
         def add_parent(self, *args, filter: int):
             super(neuron.association_unit, self).add_parent(*args)
@@ -124,7 +127,11 @@ class neuron:
 
         def activation(self):
             return np.sum((self.input_signals() * np.array(self.__inclusion_mask))) > (np.sum((self.input_signals() * np.array(self.__exclusion_mask)))) + self.threshold
-        def reinforce(self, target):
+        def reinforce(self,target, *,
+                    priority_weight:float = 4,
+                    secondary_weight:int = 1,
+                    damper:float = 1,
+                    offset:float = 0):
             self.target = target
             input_values = np.array([parent.value  for parent in self.parents]) * np.array(self.target)
             secondary_weights = (self.input_signals() * np.array(self.target))
@@ -133,21 +140,26 @@ class neuron:
             #weights = priority_weights + secondary_weights
             weights = priority_weights
             weights = weights * input_values 
-            weights = weights * 4
+            weights = weights * priority_weight
             weights = weights + secondary_weights
-            weights = weights * 1
-            weights = weights - 0.5
-            #weights = weights * 0.99
-            #weights = weights + 0.88
+            weights = weights * secondary_weight
+            weights = weights - (secondary_weight/2)
+            weights = weights * damper
+            weights = weights + offset
             for parent, weight in zip(self.parents, weights):
                 parent.weight =  parent.weight + weight
             
                 
         
-    def fit(self,sensory_units:int = 64, association_units:int = 82, response_units:int = 2 ):
+    def fit(self,sensory_units:int = 64,
+            association_units:int = 82,
+            response_units:int = 2,
+            a_unit_threshold:float = 0.569,
+            r_unit_threshold:float = 0.5763,
+            a_unit_min_weight:float = 0.02):
         self.__sensory_units = [neuron.sensory_unit(0,i,0) for i in range(0,sensory_units)]
-        self.__association_units = [neuron.association_unit(1,i,0) for i in range(0,association_units)]
-        self.__response_units = [neuron.response_unit(2,i,0) for i in range(0,response_units)]
+        self.__association_units = [neuron.association_unit(1,i,0, threshold=a_unit_threshold,min_weight=a_unit_min_weight) for i in range(0,association_units)]
+        self.__response_units = [neuron.response_unit(2,i,r_unit_threshold) for i in range(0,response_units)]
         self.__num_sensory_units = sensory_units
         self.__num_association_units = association_units
         self.__num_response_units = response_units
@@ -210,6 +222,7 @@ class neuron:
         return results
             
     
-    def reinforce(self, targets):
-        for r_unit, target in zip(self.__response_units, targets):
-            r_unit.reinforce(target)
+    def reinforce(self, targets, **kwargs):
+        kwargs = kwargs['kwargs']
+        for r_unit, target in zip(self.__response_units, targets ):
+            r_unit.reinforce(target, **kwargs)

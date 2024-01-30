@@ -1,6 +1,6 @@
 # perceptron/__init__.py
 
-"""implimentation of McCulloch–Pitts neuron"""
+"""implimentation of Rosenblatt Perceptron MK1"""
 
 __name__ = "perceptron"
 __version__ = "0.1.0"

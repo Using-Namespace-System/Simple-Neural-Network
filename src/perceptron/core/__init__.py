@@ -1,1 +1,1 @@
-from perceptron.core.mcculloch_pitts_neuron import neuron
+from perceptron.core.perceptron_mk1 import neuron

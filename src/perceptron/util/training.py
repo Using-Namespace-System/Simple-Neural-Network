@@ -19,8 +19,8 @@ def map_targets(map):
     this.__targets = {key: value for key, value in map}
 
 
-def fit():
-    this.__model.fit()
+def fit(**kwargs):
+    this.__model.fit(**kwargs)
 
 def predictions(training_set):
     results = []
@@ -68,11 +68,11 @@ def accuracy(results, targets):
 
     return np.array([result[0][:,0],result[0][:,1],result[1]/goal]).T
 
-def reinforce(training_set, targets):
+def reinforce(training_set, targets, **kwargs):
     results = []
     for percept, target in zip(training_set, targets):
         this.__model.set_sensory_units(percept.flatten())
-        this.__model.reinforce(binary_encode(target, this.__model.response_units()))
+        this.__model.reinforce(binary_encode(target, this.__model.response_units()),**kwargs)
         this.__model.set_sensory_units(percept.flatten())
         results += [binary_decode(this.__model.response_units())]
     return results
